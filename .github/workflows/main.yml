@@ -1,0 +1,96 @@
+name: Static Analysis
+on:
+  push:
+    branches: [master]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/slither.yaml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "contracts/**"
+
+ 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+        node-version: [16.x]
+
+ 
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: yarn install
+     # - run: yarn compile
+
+ 
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+ 
+
+      - name: Install dependencies
+        run: |
+          sudo snap install solc
+          python -m pip install --upgrade pip
+          pip install slither-analyzer==0.8.1 solc-select==0.2.1
+      - name: Summary of static ananlysis
+        run: |
+          slither . --print human-summary
+      - name: Contract summary of static ananlysis
+        run: |
+          slither . --print contract-summary
+      - name: Function summary
+        run: |
+          slither . --print function-summary
+      - name: Inheritance
+        run: |
+          slither . --print inheritance
+      - name: Data dependency
+        run: |
+          slither . --print data-dependency
+
+      - name: Upload report as artifact
+        uses: actions/upload-artifact@v2
+        with:
+            name: slither-report
+            path: /home/runner/work/SmartContract/SmartContract/build/contracts
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v2
+        with:
+           name: slither-report
+           path: /home/runner/work/SmartContract/SmartContract/build/contracts    
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.3.0
+        id: slither
+        with:
+         sarif: results.sarif
+         fail-on: none
+
+      -  name: Upload SARIF file
+         uses: github/codeql-action/upload-sarif@v2
+         with:
+           sarif_file: ${{ steps.slither.outputs.sarif }}
+
+      - name: Export to Json
+        run: |
+         slither . --report.json
+
+      - name: Upload Slither report
+        uses: actions/upload-artifact@v2
+        with:
+         name: Slither report
+         path: report.json
